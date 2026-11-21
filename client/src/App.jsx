@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import Auth from './components/Auth';
 import './App.css';
 
-const API_URL = 'http://localhost:5000/tasks';
+const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/$/, '');
+const API_URL = `${API_BASE_URL}/tasks`;
 
 function App() {
   // Authentication State
@@ -256,7 +257,7 @@ function App() {
       {/* User Greeting & Logout Bar */}
       <div className="user-bar">
         <span>
-          Welcome, <strong className="user-name">{user?.name || 'Student'}</strong>! 🎓
+          Welcome, <strong className="user-name">{user?.name || 'Student'}</strong>! ðŸŽ“
         </span>
         <button type="button" className="logout-btn" onClick={handleLogout}>
           Logout
@@ -293,9 +294,9 @@ function App() {
               value={newPriority}
               onChange={(e) => setNewPriority(e.target.value)}
             >
-              <option value="High">🔴 High</option>
-              <option value="Medium">🟡 Medium</option>
-              <option value="Low">🔵 Low</option>
+              <option value="High">ðŸ”´ High</option>
+              <option value="Medium">ðŸŸ¡ Medium</option>
+              <option value="Low">ðŸ”µ Low</option>
             </select>
           </div>
 
@@ -316,7 +317,7 @@ function App() {
       <div className="search-filter-section">
         {/* Search Bar */}
         <div className="search-input-wrapper">
-          <span className="search-icon">🔍</span>
+          <span className="search-icon">ðŸ”</span>
           <input
             type="text"
             className="search-input"
@@ -330,7 +331,7 @@ function App() {
               className="search-clear-btn"
               onClick={() => setSearchTerm('')}
             >
-              ✕
+              âœ•
             </button>
           )}
         </div>
@@ -370,9 +371,9 @@ function App() {
               onChange={(e) => setPriorityFilter(e.target.value)}
             >
               <option value="all">All Priorities</option>
-              <option value="High">🔴 High Priority</option>
-              <option value="Medium">🟡 Medium Priority</option>
-              <option value="Low">🔵 Low Priority</option>
+              <option value="High">ðŸ”´ High Priority</option>
+              <option value="Medium">ðŸŸ¡ Medium Priority</option>
+              <option value="Low">ðŸ”µ Low Priority</option>
             </select>
 
             <select
@@ -400,14 +401,14 @@ function App() {
 
       {/* Loading & Task List */}
       {loading ? (
-        <div className="empty-state">⏳ Loading your tasks...</div>
+        <div className="empty-state">â³ Loading your tasks...</div>
       ) : tasks.length === 0 ? (
         <div className="empty-state">
-          🎉 No tasks yet! Add your first study task above.
+          ðŸŽ‰ No tasks yet! Add your first study task above.
         </div>
       ) : displayedTasks.length === 0 ? (
         <div className="empty-state">
-          🔍 No tasks match your search and filter criteria.
+          ðŸ” No tasks match your search and filter criteria.
           <div>
             <button
               type="button"
@@ -449,21 +450,21 @@ function App() {
                     {/* Meta Badges */}
                     <div className="task-meta">
                       <span className={`badge ${priorityClass}`}>
-                        {task.priority === 'High' && '🔴'}
-                        {task.priority === 'Medium' && '🟡'}
-                        {task.priority === 'Low' && '🔵'}
+                        {task.priority === 'High' && 'ðŸ”´'}
+                        {task.priority === 'Medium' && 'ðŸŸ¡'}
+                        {task.priority === 'Low' && 'ðŸ”µ'}
                         {' '}{task.priority || 'Medium'}
                       </span>
 
                       {task.dueDate && (
                         <span className="badge badge-due">
-                          📅 {formatDate(task.dueDate)}
+                          ðŸ“… {formatDate(task.dueDate)}
                         </span>
                       )}
 
                       {taskIsOverdue && (
                         <span className="badge badge-overdue">
-                          ⚠️ Overdue
+                          âš ï¸ Overdue
                         </span>
                       )}
                     </div>
@@ -489,7 +490,7 @@ function App() {
         <span>Completed: {completedCount}</span>
         <span>Pending: {pendingCount}</span>
         {overdueCount > 0 && (
-          <span className="stat-overdue">⚠️ Overdue: {overdueCount}</span>
+          <span className="stat-overdue">âš ï¸ Overdue: {overdueCount}</span>
         )}
       </div>
     </div>
@@ -497,3 +498,4 @@ function App() {
 }
 
 export default App;
+
