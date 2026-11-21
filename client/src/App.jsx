@@ -317,7 +317,6 @@ function App() {
       <div className="search-filter-section">
         {/* Search Bar */}
         <div className="search-input-wrapper">
-          <span className="search-icon">Search</span>
           <input
             type="text"
             className="search-input"
