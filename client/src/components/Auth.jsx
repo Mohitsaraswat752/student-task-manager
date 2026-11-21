@@ -1,6 +1,7 @@
 import { useState } from 'react';
 
-const AUTH_URL = 'http://localhost:5000/auth';
+const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/$/, '');
+const AUTH_URL = `${API_BASE_URL}/auth`;
 
 function Auth({ onAuthSuccess }) {
   const [isRegister, setIsRegister] = useState(false);
