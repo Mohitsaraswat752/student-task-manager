@@ -257,7 +257,7 @@ function App() {
       {/* User Greeting & Logout Bar */}
       <div className="user-bar">
         <span>
-          Welcome, <strong className="user-name">{user?.name || 'Student'}</strong>! ðŸŽ“
+          Welcome, <strong className="user-name">{user?.name || 'Student'}</strong>!
         </span>
         <button type="button" className="logout-btn" onClick={handleLogout}>
           Logout
@@ -294,9 +294,9 @@ function App() {
               value={newPriority}
               onChange={(e) => setNewPriority(e.target.value)}
             >
-              <option value="High">ðŸ”´ High</option>
-              <option value="Medium">ðŸŸ¡ Medium</option>
-              <option value="Low">ðŸ”µ Low</option>
+              <option value="High">High</option>
+              <option value="Medium">Medium</option>
+              <option value="Low">Low</option>
             </select>
           </div>
 
@@ -317,7 +317,7 @@ function App() {
       <div className="search-filter-section">
         {/* Search Bar */}
         <div className="search-input-wrapper">
-          <span className="search-icon">ðŸ”</span>
+          <span className="search-icon">Search</span>
           <input
             type="text"
             className="search-input"
@@ -331,7 +331,7 @@ function App() {
               className="search-clear-btn"
               onClick={() => setSearchTerm('')}
             >
-              âœ•
+              Clear
             </button>
           )}
         </div>
@@ -371,9 +371,9 @@ function App() {
               onChange={(e) => setPriorityFilter(e.target.value)}
             >
               <option value="all">All Priorities</option>
-              <option value="High">ðŸ”´ High Priority</option>
-              <option value="Medium">ðŸŸ¡ Medium Priority</option>
-              <option value="Low">ðŸ”µ Low Priority</option>
+              <option value="High">High Priority</option>
+              <option value="Medium">Medium Priority</option>
+              <option value="Low">Low Priority</option>
             </select>
 
             <select
@@ -401,14 +401,14 @@ function App() {
 
       {/* Loading & Task List */}
       {loading ? (
-        <div className="empty-state">â³ Loading your tasks...</div>
+        <div className="empty-state">Loading your tasks...</div>
       ) : tasks.length === 0 ? (
         <div className="empty-state">
-          ðŸŽ‰ No tasks yet! Add your first study task above.
+          No tasks yet! Add your first study task above.
         </div>
       ) : displayedTasks.length === 0 ? (
         <div className="empty-state">
-          ðŸ” No tasks match your search and filter criteria.
+          No tasks match your search and filter criteria.
           <div>
             <button
               type="button"
@@ -450,21 +450,18 @@ function App() {
                     {/* Meta Badges */}
                     <div className="task-meta">
                       <span className={`badge ${priorityClass}`}>
-                        {task.priority === 'High' && 'ðŸ”´'}
-                        {task.priority === 'Medium' && 'ðŸŸ¡'}
-                        {task.priority === 'Low' && 'ðŸ”µ'}
-                        {' '}{task.priority || 'Medium'}
+                        {task.priority || 'Medium'}
                       </span>
 
                       {task.dueDate && (
                         <span className="badge badge-due">
-                          ðŸ“… {formatDate(task.dueDate)}
+                          Due: {formatDate(task.dueDate)}
                         </span>
                       )}
 
                       {taskIsOverdue && (
                         <span className="badge badge-overdue">
-                          âš ï¸ Overdue
+                          Overdue
                         </span>
                       )}
                     </div>
@@ -490,7 +487,7 @@ function App() {
         <span>Completed: {completedCount}</span>
         <span>Pending: {pendingCount}</span>
         {overdueCount > 0 && (
-          <span className="stat-overdue">âš ï¸ Overdue: {overdueCount}</span>
+          <span className="stat-overdue">Overdue: {overdueCount}</span>
         )}
       </div>
     </div>
