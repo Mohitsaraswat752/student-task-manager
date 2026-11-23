@@ -90,7 +90,7 @@ function Auth({ onAuthSuccess }) {
               id="name"
               type="text"
               className="form-input"
-              placeholder="e.g. Mohit Saraswat"
+              placeholder="Enter your name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               required={isRegister}
@@ -104,7 +104,7 @@ function Auth({ onAuthSuccess }) {
             id="email"
             type="email"
             className="form-input"
-            placeholder="student@example.com"
+            placeholder="Enter your email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
