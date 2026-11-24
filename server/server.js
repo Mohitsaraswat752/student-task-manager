@@ -43,19 +43,25 @@ mongoose
 // 1. AUTHENTICATION APIS
 // ============================================================
 
+// Helper to escape regex special characters for safe search queries
+const escapeRegex = (string) => {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+};
+
 // Register a new student
 app.post('/auth/register', async (req, res) => {
   try {
     const { name, email, password } = req.body;
 
-    if (!name || !email || !password) {
-      return res.status(400).json({ error: 'Please provide name, email, and password' });
+    if (!name || !email || !password || typeof name !== 'string' || typeof email !== 'string' || typeof password !== 'string') {
+      return res.status(400).json({ error: 'Please provide valid name, email, and password' });
     }
     if (password.length < 6) {
       return res.status(400).json({ error: 'Password must be at least 6 characters' });
     }
 
-    const existingUser = await User.findOne({ email });
+    const normalizedEmail = email.toLowerCase().trim();
+    const existingUser = await User.findOne({ email: normalizedEmail });
     if (existingUser) {
       return res.status(400).json({ error: 'An account with this email already exists' });
     }
@@ -65,7 +71,7 @@ app.post('/auth/register', async (req, res) => {
 
     const newUser = await User.create({
       name: name.trim(),
-      email: email.trim(),
+      email: normalizedEmail,
       password: hashedPassword,
     });
 
@@ -94,11 +100,12 @@ app.post('/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Please provide email and password' });
+    if (!email || !password || typeof email !== 'string' || typeof password !== 'string') {
+      return res.status(400).json({ error: 'Please provide valid email and password' });
     }
 
-    const user = await User.findOne({ email });
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await User.findOne({ email: normalizedEmail });
     if (!user) {
       return res.status(400).json({ error: 'Invalid email or password' });
     }
@@ -141,9 +148,9 @@ app.get('/tasks', auth, async (req, res) => {
     // Base query: Always restrict to the logged-in user's tasks
     const filter = { user: req.user.id };
 
-    // 1. Search by title (case-insensitive substring match)
-    if (search && search.trim()) {
-      filter.title = { $regex: search.trim(), $options: 'i' };
+    // 1. Search by title (case-insensitive substring match with safe regex escaping)
+    if (search && typeof search === 'string' && search.trim()) {
+      filter.title = { $regex: escapeRegex(search.trim()), $options: 'i' };
     }
 
     // 2. Filter by status (Pending vs Completed)
