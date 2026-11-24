@@ -6,7 +6,8 @@ try {
   // Ignore if not supported
 }
 
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
@@ -176,6 +177,188 @@ app.get('/tasks', auth, async (req, res) => {
   }
 });
 
+// ============================================================
+// ANALYTICS DASHBOARD API (MongoDB Aggregation)
+// Route: GET http://localhost:5000/tasks/analytics?range=7|30
+// ============================================================
+app.get('/tasks/analytics', auth, async (req, res) => {
+  try {
+    const userObjectId = new mongoose.Types.ObjectId(req.user.id);
+    const rangeDays = parseInt(req.query.range, 10) === 30 ? 30 : 7;
+
+    // Calculate beginning of today for accurate overdue comparison
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    // 1. Summary Metrics Aggregation Pipeline
+    const summaryStats = await Task.aggregate([
+      { $match: { user: userObjectId } },
+      {
+        $group: {
+          _id: null,
+          totalTasks: { $sum: 1 },
+          completedTasks: {
+            $sum: { $cond: [{ $eq: ['$completed', true] }, 1, 0] }
+          },
+          pendingTasks: {
+            $sum: { $cond: [{ $eq: ['$completed', false] }, 1, 0] }
+          },
+          overdueTasks: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ['$completed', false] },
+                    { $ne: ['$dueDate', null] },
+                    { $lt: ['$dueDate', startOfToday] }
+                  ]
+                },
+                1,
+                0
+              ]
+            }
+          }
+        }
+      }
+    ]);
+
+    const summary = summaryStats[0] || {
+      totalTasks: 0,
+      completedTasks: 0,
+      pendingTasks: 0,
+      overdueTasks: 0
+    };
+
+    const completionPercentage =
+      summary.totalTasks > 0
+        ? Math.round((summary.completedTasks / summary.totalTasks) * 100)
+        : 0;
+
+    // 2. Priority Distribution Aggregation Pipeline
+    const priorityAgg = await Task.aggregate([
+      { $match: { user: userObjectId } },
+      {
+        $group: {
+          _id: '$priority',
+          total: { $sum: 1 },
+          completed: {
+            $sum: { $cond: [{ $eq: ['$completed', true] }, 1, 0] }
+          }
+        }
+      }
+    ]);
+
+    const priorityMap = {
+      High: { total: 0, completed: 0 },
+      Medium: { total: 0, completed: 0 },
+      Low: { total: 0, completed: 0 }
+    };
+
+    priorityAgg.forEach((item) => {
+      if (priorityMap[item._id]) {
+        priorityMap[item._id] = { total: item.total, completed: item.completed };
+      }
+    });
+
+    const priorityDistribution = [
+      {
+        priority: 'High',
+        total: priorityMap.High.total,
+        completed: priorityMap.High.completed,
+        pending: priorityMap.High.total - priorityMap.High.completed,
+        color: '#ef4444'
+      },
+      {
+        priority: 'Medium',
+        total: priorityMap.Medium.total,
+        completed: priorityMap.Medium.completed,
+        pending: priorityMap.Medium.total - priorityMap.Medium.completed,
+        color: '#f59e0b'
+      },
+      {
+        priority: 'Low',
+        total: priorityMap.Low.total,
+        completed: priorityMap.Low.completed,
+        pending: priorityMap.Low.total - priorityMap.Low.completed,
+        color: '#3b82f6'
+      }
+    ];
+
+    // 3. Status Distribution (for Doughnut Chart)
+    const statusDistribution = [
+      { name: 'Completed', value: summary.completedTasks, color: '#10b981' },
+      { name: 'Pending', value: summary.pendingTasks, color: '#f59e0b' }
+    ];
+
+    // 4. Productivity Timeline Aggregation (Dynamic: 7 or 30 Days)
+    const rangeStartDate = new Date();
+    rangeStartDate.setDate(rangeStartDate.getDate() - (rangeDays - 1));
+    rangeStartDate.setHours(0, 0, 0, 0);
+
+    const timelineStats = await Task.aggregate([
+      {
+        $match: {
+          user: userObjectId,
+          createdAt: { $gte: rangeStartDate }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: { format: '%Y-%m-%d', date: '$createdAt' }
+          },
+          created: { $sum: 1 },
+          completed: {
+            $sum: { $cond: [{ $eq: ['$completed', true] }, 1, 0] }
+          }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+
+    // Build timeline dates (filling gap days with 0)
+    const daysMap = {};
+    const timelineDates = [];
+
+    for (let i = rangeDays - 1; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      const dayLabel =
+        rangeDays === 7
+          ? d.toLocaleDateString(undefined, { weekday: 'short' })
+          : d.toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' });
+      daysMap[dateStr] = { date: dateStr, day: dayLabel, created: 0, completed: 0 };
+      timelineDates.push(dateStr);
+    }
+
+    timelineStats.forEach((entry) => {
+      if (daysMap[entry._id]) {
+        daysMap[entry._id].created = entry.created;
+        daysMap[entry._id].completed = entry.completed;
+      }
+    });
+
+    const productivity = timelineDates.map((dateStr) => daysMap[dateStr]);
+
+    // Return combined analytics only for the logged-in user
+    res.json({
+      range: rangeDays,
+      totalTasks: summary.totalTasks,
+      completedTasks: summary.completedTasks,
+      pendingTasks: summary.pendingTasks,
+      overdueTasks: summary.overdueTasks,
+      completionPercentage,
+      priorityDistribution,
+      statusDistribution,
+      productivity,
+      weeklyProductivity: productivity
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // 2. ADD A NEW TASK (With Priority & Due Date)
 // Route: POST http://localhost:5000/tasks
 app.post('/tasks', auth, async (req, res) => {
@@ -209,6 +392,11 @@ app.post('/tasks', auth, async (req, res) => {
 app.put('/tasks/:id', auth, async (req, res) => {
   try {
     const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid task ID format' });
+    }
+
     const task = await Task.findOne({ _id: id, user: req.user.id });
 
     if (!task) {
@@ -217,6 +405,9 @@ app.put('/tasks/:id', auth, async (req, res) => {
 
     // Update optional fields if sent
     if (req.body.title !== undefined) {
+      if (!req.body.title.trim()) {
+        return res.status(400).json({ error: 'Task title cannot be empty' });
+      }
       task.title = req.body.title.trim();
     }
 
@@ -254,6 +445,11 @@ app.put('/tasks/:id', auth, async (req, res) => {
 app.delete('/tasks/:id', auth, async (req, res) => {
   try {
     const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid task ID format' });
+    }
+
     const deletedTask = await Task.findOneAndDelete({ _id: id, user: req.user.id });
 
     if (!deletedTask) {

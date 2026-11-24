@@ -1,5 +1,13 @@
 ﻿import { useState, useEffect } from 'react';
 import Auth from './components/Auth';
+import Analytics from './components/Analytics';
+import Sidebar from './components/Sidebar';
+import Topbar from './components/Topbar';
+import DashboardHome from './components/DashboardHome';
+import TaskManager from './components/TaskManager';
+import CalendarView from './components/CalendarView';
+import ProfileView from './components/ProfileView';
+import SettingsView from './components/SettingsView';
 import './App.css';
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/$/, '');
@@ -16,12 +24,25 @@ function App() {
     }
   });
 
-  // Task & Form State
+  // Navigation View State: 'dashboard' | 'tasks' | 'calendar' | 'analytics' | 'profile' | 'settings'
+  const [currentView, setCurrentView] = useState('dashboard');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [darkMode, setDarkMode] = useState(() => {
+    return localStorage.getItem('taskflow_theme') === 'dark';
+  });
+
+  // Task Data State
   const [tasks, setTasks] = useState([]);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newPriority, setNewPriority] = useState('Medium');
   const [newDueDate, setNewDueDate] = useState('');
   const [loading, setLoading] = useState(true);
+
+  // Editing State
+  const [editingTaskId, setEditingTaskId] = useState(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editPriority, setEditPriority] = useState('Medium');
+  const [editDueDate, setEditDueDate] = useState('');
 
   // Search, Filter & Sort State
   const [searchTerm, setSearchTerm] = useState('');
@@ -37,6 +58,15 @@ function App() {
       setLoading(false);
     }
   }, [token]);
+
+  // Dark Mode Toggle
+  const toggleDarkMode = () => {
+    setDarkMode((prev) => {
+      const next = !prev;
+      localStorage.setItem('taskflow_theme', next ? 'dark' : 'light');
+      return next;
+    });
+  };
 
   // 1. Fetch user's tasks with JWT Bearer Token
   const fetchTasks = async () => {
@@ -149,7 +179,58 @@ function App() {
     }
   };
 
-  // 5. Logout handler
+  // 5. Start editing a task
+  const handleStartEdit = (task) => {
+    setEditingTaskId(task._id);
+    setEditTitle(task.title);
+    setEditPriority(task.priority || 'Medium');
+    setEditDueDate(
+      task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : ''
+    );
+  };
+
+  // 6. Cancel editing
+  const handleCancelEdit = () => {
+    setEditingTaskId(null);
+    setEditTitle('');
+    setEditPriority('Medium');
+    setEditDueDate('');
+  };
+
+  // 7. Save edited task (PUT)
+  const handleSaveEdit = async (id) => {
+    if (!editTitle.trim()) return;
+
+    try {
+      const response = await fetch(`${API_URL}/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          title: editTitle.trim(),
+          priority: editPriority,
+          dueDate: editDueDate || null,
+        }),
+      });
+
+      if (response.status === 401) {
+        handleLogout();
+        return;
+      }
+
+      if (response.ok) {
+        const updatedTask = await response.json();
+        setTasks(tasks.map((t) => (t._id === id ? updatedTask : t)));
+        handleCancelEdit();
+      }
+    } catch (error) {
+      console.error('Error updating task:', error);
+    }
+  };
+
+  // 8. Logout handler
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -185,18 +266,16 @@ function App() {
     setSortBy('default');
   };
 
-  // 6. COMBINED SEARCH, FILTER, AND SORT LOGIC
+  // 9. COMBINED SEARCH, FILTER, AND SORT LOGIC
   const getFilteredAndSortedTasks = () => {
     const priorityWeights = { High: 3, Medium: 2, Low: 1 };
 
     // Step A: Apply Search & Filters
     const filtered = tasks.filter((task) => {
-      // 1. Search filter (title matching)
       const matchesSearch = task.title
         .toLowerCase()
         .includes(searchTerm.toLowerCase().trim());
 
-      // 2. Status filter (All, Pending, Completed)
       const matchesStatus =
         statusFilter === 'all'
           ? true
@@ -204,7 +283,6 @@ function App() {
           ? task.completed
           : !task.completed;
 
-      // 3. Priority filter (All, High, Medium, Low)
       const matchesPriority =
         priorityFilter === 'all' ? true : task.priority === priorityFilter;
 
@@ -216,16 +294,15 @@ function App() {
       if (sortBy === 'priority') {
         const weightA = priorityWeights[a.priority] || 2;
         const weightB = priorityWeights[b.priority] || 2;
-        return weightB - weightA; // High -> Medium -> Low
+        return weightB - weightA;
       }
 
       if (sortBy === 'dueDate') {
-        if (!a.dueDate) return 1;  // Tasks without date pushed to end
+        if (!a.dueDate) return 1;
         if (!b.dueDate) return -1;
-        return new Date(a.dueDate) - new Date(b.dueDate); // Earliest first
+        return new Date(a.dueDate) - new Date(b.dueDate);
       }
 
-      // Default: Original creation order (most recent first)
       return 0;
     });
   };
@@ -233,12 +310,14 @@ function App() {
   // Render Auth component if not logged in
   if (!token) {
     return (
-      <Auth
-        onAuthSuccess={(newToken, newUser) => {
-          setToken(newToken);
-          setUser(newUser);
-        }}
-      />
+      <div className="auth-page-wrapper">
+        <Auth
+          onAuthSuccess={(newToken, newUser) => {
+            setToken(newToken);
+            setUser(newUser);
+          }}
+        />
+      </div>
     );
   }
 
@@ -253,245 +332,126 @@ function App() {
     sortBy !== 'default';
 
   return (
-    <div className="app-container">
-      {/* User Greeting & Logout Bar */}
-      <div className="user-bar">
-        <span>
-          Welcome, <strong className="user-name">{user?.name || 'Student'}</strong>!
-        </span>
-        <button type="button" className="logout-btn" onClick={handleLogout}>
-          Logout
-        </button>
-      </div>
+    <div className="dashboard-app" data-theme={darkMode ? 'dark' : 'light'}>
+      {/* 1. Left SaaS Sidebar */}
+      <Sidebar
+        currentView={currentView}
+        onNavigate={(view) => setCurrentView(view)}
+        user={user}
+        onLogout={handleLogout}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        taskStats={{ total: tasks.length, pending: pendingCount }}
+      />
 
-      {/* Header */}
-      <div className="header">
-        <h1>Student Task Manager</h1>
-        <p>Search, filter, and prioritize your study goals</p>
-      </div>
+      {/* 2. Main Workspace Area */}
+      <div className="dashboard-main-area">
+        {/* SaaS Top Navigation Bar */}
+        <Topbar
+          currentView={currentView}
+          onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
+          darkMode={darkMode}
+          onToggleDarkMode={toggleDarkMode}
+          onQuickNewTask={() => setCurrentView('tasks')}
+          user={user}
+        />
 
-      {/* Add Task Form with Priority & Due Date */}
-      <form onSubmit={handleAddTask} className="task-form">
-        <div className="task-form-main">
-          <input
-            type="text"
-            className="task-input"
-            placeholder="Enter a new student task..."
-            value={newTaskTitle}
-            onChange={(e) => setNewTaskTitle(e.target.value)}
-          />
-          <button type="submit" className="add-btn">
-            Add Task
-          </button>
-        </div>
+        {/* Dynamic Main Content Views */}
+        <main className="dashboard-content-scroll">
+          <div className="saas-page-container">
+            {/* VIEW 1: DASHBOARD HOME */}
+            {currentView === 'dashboard' && (
+              <DashboardHome
+                user={user}
+                tasks={tasks}
+                onNavigate={(view) => setCurrentView(view)}
+                onQuickAddTask={() => setCurrentView('tasks')}
+                onToggleComplete={handleToggleComplete}
+                loading={loading}
+              />
+            )}
 
-        <div className="task-form-options">
-          <div className="form-option-group">
-            <label htmlFor="priority">Priority:</label>
-            <select
-              id="priority"
-              className="form-select"
-              value={newPriority}
-              onChange={(e) => setNewPriority(e.target.value)}
-            >
-              <option value="High">High</option>
-              <option value="Medium">Medium</option>
-              <option value="Low">Low</option>
-            </select>
-          </div>
+            {/* VIEW 2: MY TASKS */}
+            {currentView === 'tasks' && (
+              <TaskManager
+                tasks={tasks}
+                newTaskTitle={newTaskTitle}
+                setNewTaskTitle={setNewTaskTitle}
+                newPriority={newPriority}
+                setNewPriority={setNewPriority}
+                newDueDate={newDueDate}
+                setNewDueDate={setNewDueDate}
+                handleAddTask={handleAddTask}
+                handleToggleComplete={handleToggleComplete}
+                handleDeleteTask={handleDeleteTask}
+                handleStartEdit={handleStartEdit}
+                handleCancelEdit={handleCancelEdit}
+                handleSaveEdit={handleSaveEdit}
+                editingTaskId={editingTaskId}
+                editTitle={editTitle}
+                setEditTitle={setEditTitle}
+                editPriority={editPriority}
+                setEditPriority={setEditPriority}
+                editDueDate={editDueDate}
+                setEditDueDate={setEditDueDate}
+                searchTerm={searchTerm}
+                setSearchTerm={setSearchTerm}
+                statusFilter={statusFilter}
+                setStatusFilter={setStatusFilter}
+                priorityFilter={priorityFilter}
+                setPriorityFilter={setPriorityFilter}
+                sortBy={sortBy}
+                setSortBy={setSortBy}
+                handleResetFilters={handleResetFilters}
+                displayedTasks={displayedTasks}
+                loading={loading}
+                completedCount={completedCount}
+                pendingCount={pendingCount}
+                overdueCount={overdueCount}
+                isOverdue={isOverdue}
+                formatDate={formatDate}
+              />
+            )}
 
-          <div className="form-option-group">
-            <label htmlFor="dueDate">Due Date:</label>
-            <input
-              id="dueDate"
-              type="date"
-              className="form-date"
-              value={newDueDate}
-              onChange={(e) => setNewDueDate(e.target.value)}
-            />
-          </div>
-        </div>
-      </form>
+            {/* VIEW 3: ANALYTICS DASHBOARD */}
+            {currentView === 'analytics' && (
+              <Analytics
+                token={token}
+                onBack={() => setCurrentView('dashboard')}
+                onLogout={handleLogout}
+              />
+            )}
 
-      {/* SEARCH & FILTER TOOLBAR */}
-      <div className="search-filter-section">
-        {/* Search Bar */}
-        <div className="search-input-wrapper">
-          <input
-            type="text"
-            className="search-input"
-            placeholder="Search tasks by title..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-          {searchTerm && (
-            <button
-              type="button"
-              className="search-clear-btn"
-              onClick={() => setSearchTerm('')}
-            >
-              Clear
-            </button>
-          )}
-        </div>
+            {/* VIEW 4: CALENDAR VIEW */}
+            {currentView === 'calendar' && (
+              <CalendarView
+                tasks={tasks}
+                onToggleComplete={handleToggleComplete}
+                onNavigateToTasks={() => setCurrentView('tasks')}
+              />
+            )}
 
-        {/* Filter Controls Row */}
-        <div className="filter-row">
-          {/* Status Filter Pills */}
-          <div className="status-pills">
-            <button
-              type="button"
-              className={`status-pill ${statusFilter === 'all' ? 'active' : ''}`}
-              onClick={() => setStatusFilter('all')}
-            >
-              All ({tasks.length})
-            </button>
-            <button
-              type="button"
-              className={`status-pill ${statusFilter === 'pending' ? 'active' : ''}`}
-              onClick={() => setStatusFilter('pending')}
-            >
-              Pending ({pendingCount})
-            </button>
-            <button
-              type="button"
-              className={`status-pill ${statusFilter === 'completed' ? 'active' : ''}`}
-              onClick={() => setStatusFilter('completed')}
-            >
-              Done ({completedCount})
-            </button>
-          </div>
+            {/* VIEW 5: PROFILE VIEW */}
+            {currentView === 'profile' && (
+              <ProfileView
+                user={user}
+                tasks={tasks}
+                onLogout={handleLogout}
+              />
+            )}
 
-          {/* Priority & Sorting Dropdowns */}
-          <div className="filter-dropdowns">
-            <select
-              className="filter-select"
-              value={priorityFilter}
-              onChange={(e) => setPriorityFilter(e.target.value)}
-            >
-              <option value="all">All Priorities</option>
-              <option value="High">High Priority</option>
-              <option value="Medium">Medium Priority</option>
-              <option value="Low">Low Priority</option>
-            </select>
-
-            <select
-              className="filter-select"
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-            >
-              <option value="default">Sort: Newest First</option>
-              <option value="dueDate">Sort: Due Date (Earliest)</option>
-              <option value="priority">Sort: Priority (High to Low)</option>
-            </select>
-
-            {hasActiveFilters && (
-              <button
-                type="button"
-                className="reset-filters-btn"
-                onClick={handleResetFilters}
-              >
-                Reset
-              </button>
+            {/* VIEW 6: SETTINGS VIEW */}
+            {currentView === 'settings' && (
+              <SettingsView
+                darkMode={darkMode}
+                onToggleDarkMode={toggleDarkMode}
+              />
             )}
           </div>
-        </div>
-      </div>
-
-      {/* Loading & Task List */}
-      {loading ? (
-        <div className="empty-state">Loading your tasks...</div>
-      ) : tasks.length === 0 ? (
-        <div className="empty-state">
-          No tasks yet! Add your first study task above.
-        </div>
-      ) : displayedTasks.length === 0 ? (
-        <div className="empty-state">
-          No tasks match your search and filter criteria.
-          <div>
-            <button
-              type="button"
-              className="empty-filter-btn"
-              onClick={handleResetFilters}
-            >
-              Clear All Filters
-            </button>
-          </div>
-        </div>
-      ) : (
-        <ul className="task-list">
-          {displayedTasks.map((task) => {
-            const taskIsOverdue = isOverdue(task);
-            const priorityClass = `badge-priority-${(task.priority || 'medium').toLowerCase()}`;
-
-            return (
-              <li
-                key={task._id}
-                className={`task-item ${taskIsOverdue ? 'item-overdue' : ''}`}
-              >
-                <div className="task-left">
-                  <input
-                    type="checkbox"
-                    className="task-checkbox"
-                    checked={task.completed}
-                    onChange={() => handleToggleComplete(task)}
-                  />
-                  <div
-                    className="task-content"
-                    onClick={() => handleToggleComplete(task)}
-                  >
-                    <span
-                      className={`task-text ${task.completed ? 'task-completed' : ''}`}
-                    >
-                      {task.title}
-                    </span>
-
-                    {/* Meta Badges */}
-                    <div className="task-meta">
-                      <span className={`badge ${priorityClass}`}>
-                        {task.priority || 'Medium'}
-                      </span>
-
-                      {task.dueDate && (
-                        <span className="badge badge-due">
-                          Due: {formatDate(task.dueDate)}
-                        </span>
-                      )}
-
-                      {taskIsOverdue && (
-                        <span className="badge badge-overdue">
-                          Overdue
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  className="delete-btn"
-                  onClick={() => handleDeleteTask(task._id)}
-                >
-                  Delete
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-
-      {/* Summary Footer */}
-      <div className="stats-bar">
-        <span>Showing: {displayedTasks.length} of {tasks.length}</span>
-        <span>Completed: {completedCount}</span>
-        <span>Pending: {pendingCount}</span>
-        {overdueCount > 0 && (
-          <span className="stat-overdue">Overdue: {overdueCount}</span>
-        )}
+        </main>
       </div>
     </div>
   );
 }
 
 export default App;
-
