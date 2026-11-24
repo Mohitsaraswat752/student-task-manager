@@ -372,24 +372,43 @@ app.post('/tasks', auth, async (req, res) => {
   try {
     const { title, priority, dueDate } = req.body;
 
-    if (!title || !title.trim()) {
+    if (!title || typeof title !== 'string' || !title.trim()) {
       return res.status(400).json({ error: 'Task title is required' });
     }
 
-    // Validate priority (defaults to Medium if omitted or invalid)
+    // Validate priority (defaults to Medium if omitted, errors if invalid value provided)
     const validPriorities = ['High', 'Medium', 'Low'];
-    const taskPriority = validPriorities.includes(priority) ? priority : 'Medium';
+    let taskPriority = 'Medium';
+    if (priority !== undefined && priority !== null) {
+      if (!validPriorities.includes(priority)) {
+        return res.status(400).json({ error: 'Priority must be High, Medium, or Low' });
+      }
+      taskPriority = priority;
+    }
+
+    // Validate dueDate (optional, but must be a valid timestamp if provided)
+    let parsedDueDate = null;
+    if (dueDate !== undefined && dueDate !== null && dueDate !== '') {
+      const parsed = new Date(dueDate);
+      if (isNaN(parsed.getTime())) {
+        return res.status(400).json({ error: 'Invalid due date format' });
+      }
+      parsedDueDate = parsed;
+    }
 
     const newTask = await Task.create({
       title: title.trim(),
       priority: taskPriority,
-      dueDate: dueDate ? new Date(dueDate) : null,
+      dueDate: parsedDueDate,
       completed: false,
       user: req.user.id,
     });
 
     res.status(201).json(newTask);
   } catch (error) {
+    if (error.name === 'ValidationError' || error.name === 'CastError') {
+      return res.status(400).json({ error: error.message });
+    }
     res.status(500).json({ error: error.message });
   }
 });
@@ -412,7 +431,7 @@ app.put('/tasks/:id', auth, async (req, res) => {
 
     // Update optional fields if sent
     if (req.body.title !== undefined) {
-      if (!req.body.title.trim()) {
+      if (typeof req.body.title !== 'string' || !req.body.title.trim()) {
         return res.status(400).json({ error: 'Task title cannot be empty' });
       }
       task.title = req.body.title.trim();
@@ -420,16 +439,28 @@ app.put('/tasks/:id', auth, async (req, res) => {
 
     if (req.body.priority !== undefined) {
       const validPriorities = ['High', 'Medium', 'Low'];
-      if (validPriorities.includes(req.body.priority)) {
-        task.priority = req.body.priority;
+      if (!validPriorities.includes(req.body.priority)) {
+        return res.status(400).json({ error: 'Priority must be High, Medium, or Low' });
       }
+      task.priority = req.body.priority;
     }
 
     if (req.body.dueDate !== undefined) {
-      task.dueDate = req.body.dueDate ? new Date(req.body.dueDate) : null;
+      if (req.body.dueDate === null || req.body.dueDate === '') {
+        task.dueDate = null;
+      } else {
+        const parsed = new Date(req.body.dueDate);
+        if (isNaN(parsed.getTime())) {
+          return res.status(400).json({ error: 'Invalid due date format' });
+        }
+        task.dueDate = parsed;
+      }
     }
 
     if (req.body.completed !== undefined) {
+      if (typeof req.body.completed !== 'boolean') {
+        return res.status(400).json({ error: 'Completed status must be a boolean' });
+      }
       task.completed = req.body.completed;
     } else if (
       req.body.title === undefined &&
@@ -443,6 +474,9 @@ app.put('/tasks/:id', auth, async (req, res) => {
     const updatedTask = await task.save();
     res.json(updatedTask);
   } catch (error) {
+    if (error.name === 'ValidationError' || error.name === 'CastError') {
+      return res.status(400).json({ error: error.message });
+    }
     res.status(500).json({ error: error.message });
   }
 });
