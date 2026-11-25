@@ -8,6 +8,7 @@ import TaskManager from './components/TaskManager';
 import CalendarView from './components/CalendarView';
 import ProfileView from './components/ProfileView';
 import SettingsView from './components/SettingsView';
+import { formatDate, isOverdue, toDateInputString, parseLocalDate } from './utils/dateUtils';
 import './App.css';
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/$/, '');
@@ -184,9 +185,7 @@ function App() {
     setEditingTaskId(task._id);
     setEditTitle(task.title);
     setEditPriority(task.priority || 'Medium');
-    setEditDueDate(
-      task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : ''
-    );
+    setEditDueDate(toDateInputString(task.dueDate));
   };
 
   // 6. Cancel editing
@@ -239,25 +238,6 @@ function App() {
     setTasks([]);
   };
 
-  // Helper: check if a task is overdue
-  const isOverdue = (task) => {
-    if (!task.dueDate || task.completed) return false;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return new Date(task.dueDate) < today;
-  };
-
-  // Helper: format due date
-  const formatDate = (dateStr) => {
-    if (!dateStr) return '';
-    const date = new Date(dateStr);
-    return date.toLocaleDateString(undefined, {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
-
   // Reset all search and filter controls
   const handleResetFilters = () => {
     setSearchTerm('');
@@ -300,7 +280,9 @@ function App() {
       if (sortBy === 'dueDate') {
         if (!a.dueDate) return 1;
         if (!b.dueDate) return -1;
-        return new Date(a.dueDate) - new Date(b.dueDate);
+        const dateA = parseLocalDate(a.dueDate);
+        const dateB = parseLocalDate(b.dueDate);
+        return (dateA?.getTime() || 0) - (dateB?.getTime() || 0);
       }
 
       return 0;

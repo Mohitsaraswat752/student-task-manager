@@ -7,6 +7,7 @@ import {
   Clock,
   Plus,
 } from 'lucide-react';
+import { toDateInputString, getTodayInputString } from '../utils/dateUtils';
 
 function CalendarView({ tasks = [], onToggleComplete, onNavigateToTasks }) {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -42,7 +43,7 @@ function CalendarView({ tasks = [], onToggleComplete, onNavigateToTasks }) {
   const tasksByDate = {};
   tasks.forEach((task) => {
     if (task.dueDate) {
-      const dateKey = new Date(task.dueDate).toISOString().split('T')[0];
+      const dateKey = toDateInputString(task.dueDate);
       if (!tasksByDate[dateKey]) {
         tasksByDate[dateKey] = [];
       }
@@ -50,7 +51,7 @@ function CalendarView({ tasks = [], onToggleComplete, onNavigateToTasks }) {
     }
   });
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getTodayInputString();
 
   return (
     <div className="calendar-view-container">

@@ -193,9 +193,9 @@ app.get('/tasks/analytics', auth, async (req, res) => {
     const userObjectId = new mongoose.Types.ObjectId(req.user.id);
     const rangeDays = parseInt(req.query.range, 10) === 30 ? 30 : 7;
 
-    // Calculate beginning of today for accurate overdue comparison
+    // Calculate beginning of today in UTC for accurate overdue comparison
     const now = new Date();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 
     // 1. Summary Metrics Aggregation Pipeline
     const summaryStats = await Task.aggregate([

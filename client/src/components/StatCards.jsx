@@ -6,18 +6,14 @@ import {
   TrendingUp,
   ArrowUpRight,
 } from 'lucide-react';
+import { isOverdue } from '../utils/dateUtils';
 
 function StatCards({ tasks = [], onCardClick }) {
   // Calculate real metrics directly from user tasks
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter((t) => t.completed).length;
   const pendingTasks = totalTasks - completedTasks;
-  const overdueTasks = tasks.filter(
-    (t) => !t.completed && t.dueDate && new Date(t.dueDate) < today
-  ).length;
+  const overdueTasks = tasks.filter(isOverdue).length;
 
   const completionPercentage =
     totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;

@@ -13,6 +13,7 @@ import {
   CalendarClock,
 } from 'lucide-react';
 import StatCards from './StatCards';
+import { isOverdue, isDueToday, formatDate, parseLocalDate } from '../utils/dateUtils';
 
 function DashboardHome({
   user,
@@ -45,29 +46,6 @@ function DashboardHome({
   const completionPercentage =
     totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-
-  // Helper: check if a task is overdue
-  const isOverdue = (task) =>
-    !task.completed && task.dueDate && new Date(task.dueDate) < todayStart;
-
-  // Helper: filter tasks due today
-  const isDueToday = (task) => {
-    if (!task.dueDate) return false;
-    const taskDate = new Date(task.dueDate).toISOString().split('T')[0];
-    const today = new Date().toISOString().split('T')[0];
-    return taskDate === today;
-  };
-
-  const formatDate = (dateStr) => {
-    if (!dateStr) return '';
-    return new Date(dateStr).toLocaleDateString(undefined, {
-      month: 'short',
-      day: 'numeric',
-    });
-  };
-
   // Helper: friendly relative time for recent activity
   const formatRelativeTime = (dateStr) => {
     if (!dateStr) return 'Recently';
@@ -90,7 +68,11 @@ function DashboardHome({
   // 2. Upcoming Deadlines List (sorted chronologically earliest first)
   const upcomingDeadlinesList = tasks
     .filter((t) => t.dueDate)
-    .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))
+    .sort((a, b) => {
+      const dateA = parseLocalDate(a.dueDate);
+      const dateB = parseLocalDate(b.dueDate);
+      return (dateA?.getTime() || 0) - (dateB?.getTime() || 0);
+    })
     .slice(0, 6);
 
   // 3. Recent Activity Stream (based on updatedAt / createdAt)
